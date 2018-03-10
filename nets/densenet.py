@@ -5,9 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-
-slim = tf.contrib.slim
-
+import tensorflow.contrib.slim as slim
 
 def trunc_normal(stddev): return tf.truncated_normal_initializer(stddev=stddev)
 
@@ -28,7 +26,6 @@ def block(net, layers, growth, scope='block'):
                               scope=scope + '_conv3x3' + str(idx))
         net = tf.concat(axis=3, values=[net, tmp])
     return net
-
 
 def densenet(images, num_classes=1001, is_training=False,
              dropout_keep_prob=0.8,
@@ -55,15 +52,44 @@ def densenet(images, num_classes=1001, is_training=False,
     def reduce_dim(input_feature):
         return int(int(input_feature.shape[-1]) * compression_rate)
 
+    def transition_layer(net, scope='transition_layer'):
+        channels = reduce_dim(net)
+        current = slim.batch_norm(net, scope=scope + '_bn')
+        current = slim.conv2d(current, channels, [1, 1], scope=scope + '_conv')
+        current = slim.avg_pool2d(current, [2, 2], 2, scope=scope + "_avgPool")
+        return current
+
     end_points = {}
 
     with tf.variable_scope(scope, 'DenseNet', [images, num_classes]):
         with slim.arg_scope(bn_drp_scope(is_training=is_training,
                                          keep_prob=dropout_keep_prob)) as ssc:
-            pass
             ##########################
             # Put your code here.
             ##########################
+            with slim.arg_scope(densenet_arg_scope(weight_decay=0.004)) as dsc:
+                layers = 5
+                net = images
+
+                end_point = "block1"
+                net = block(net, layers, growth, end_point)
+
+                end_point = "transition1"
+                net = transition_layer(net, end_point)
+
+                end_point = "block2"
+                net = block(net, layers, growth, end_point)
+
+                end_point = "transition2"
+                net = transition_layer(net, end_point)
+
+                end_point = "block3"
+                net = block(net, layers, growth, end_point)
+
+                net = tf.reduce_mean(net, [1, 2], keep_dims=True)
+                logits = slim.conv2d(net, num_classes, [1, 1], activation_fn=None,
+                                     normalizer_fn=None, scope='Conv2d_1c_1x1')
+                logits = tf.squeeze(logits, [1, 2], name="SpatialSqueeze")
 
     return logits, end_points
 

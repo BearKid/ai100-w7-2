@@ -86,10 +86,11 @@ def densenet(images, num_classes=1001, is_training=False,
                 end_point = "block3"
                 net = block(net, layers, growth, end_point)
 
-                net = tf.reduce_mean(net, [1, 2], keep_dims=True)
+                net = tf.reduce_mean(net, [1, 2], keep_dims=False)
                 logits = slim.conv2d(net, num_classes, [1, 1], activation_fn=None,
                                      normalizer_fn=None, scope='Conv2d_1c_1x1')
-                logits = tf.squeeze(logits, [1, 2], name="SpatialSqueeze")
+
+                end_points["prediction"] = logits
 
     return logits, end_points
 
